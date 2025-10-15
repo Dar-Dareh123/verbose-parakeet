@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+IFS=$'\n\t'
+trap ctrl_c 2
+source ${HOME}/.local/etc/i-Haklab/variables 
+source $iHETC/functions
+
+# === Configuración inicial ===
+API_KEY="$APIKEY_chatGPT"
+MODEL="gpt-4o-mini"
+SIZE="512x512"
+TEMP=0.7
+MAXTOKENS=1024
+CHAT_DIR="${HOME}/.chatgpt_chats"
+
+# === Validar API Key ===
+[[ -z "$API_KEY" ]] && {
+    echo -en "$R(>_)$W An openAI API Key is required, set it running 'i-Haklab setapikey"
+    exit 1
+}
+
+mkdir -p "$CHAT_DIR"
+
+# === Funciones auxiliares ===
+handle_error() {
+    if echo "$1" | jq -e '.error' >/dev/null; then
+        echo -en "\n$R(>_)$W $(echo "$1" | jq -r '.error.message')"
+        exit 1
+    fi
+}
+
+list_chats() {
+    echo -en "\n📂 Saved Chats:\n"
+    if [ -z "$(ls -A "$CHAT_DIR"/*.json 2>/dev/null)" ]; then
+        echo "(There's not saved chats)"
+        return 1
+    fi
+    printf "%-3s %-25s %-20s %s\n" "#" "File" "Date" "Size"
+    i=1
+    for file in "$CHAT_DIR"/*.json; do
+        date=$(date -r "$file" "+%Y-%m-%d %H:%M")
+        size=$(du -h "$file" | awk '{print $1}')
+        name=$(basename "$file")
+        printf "%-3s %-25s %-20s %s\n" "$i" "$name" "$date" "$size"
+        ((i++))
+    done
+}
+
+mannage_chats() {
+    while true; do
+        list_chats
+        echo -e "\n1) Delete chat\n2) Rename chat\n3) Back"
+        read -rp "Choose an option: " opc
+        case $opc in
+            1)
+                read -rp "Number of chat to delete: " num
+                file=$(ls "$CHAT_DIR"/*.json | sed -n "${num}p")
+                [[ -f "$file" ]] && rm "$file" && echo "🗑 Successfully."
+                ;;
+            2)
+                read -rp "Number of chat to rename: " num
+                file=$(ls "$CHAT_DIR"/*.json | sed -n "${num}p")
+                if [[ -f "$file" ]]; then
+                    read -rp "New name: " new
+                    mv "$file" "$CHAT_DIR/${new// /_}.json"
+                    echo "✏ Successfully ."
+                fi
+                ;;
+            3) break ;;
+            *) echo -en "$R(>_)$W Invalid option.\n" ;;
+        esac
+    done
+}
+
+select_chat() {
+    list_chats
+    echo "N) New chat"
+    echo "G) Mannage chats"
+    read -rp "Choose an option: " choice
+
+    if [[ "$choice" =~ ^[0-9]+$ ]]; then
+        CHAT_FILE=$(ls "$CHAT_DIR"/*.json | sed -n "${choice}p")
+        messages=$(cat "$CHAT_FILE")
+        echo "✅ Chat loaded: $(basename "$CHAT_FILE")"
+    elif [[ "$choice" =~ ^[Nn]$ ]]; then
+        read -rp "Name of new chat: " name
+        CHAT_FILE="$CHAT_DIR/${name// /_}.json"
+        messages='[{"role":"system","content":"You are ChatGPT, a helpful assistant. Responde en español por defecto."}]'
+        echo "$messages" > "$CHAT_FILE"
+        echo "🆕 New chat created."
+    elif [[ "$choice" =~ ^[Gg]$ ]]; then
+        mannage_chats
+        select_chat
+    else
+        echo -en "$R(>_)$W Invald option.\n"
+        select_chat
+    fi
+}
+
+get_prompt() {
+    echo -e "\n📥 Write your message (CTRL+D to send it):"
+    prompt=$(</dev/stdin)
+}
+
+send_request() {
+    response=$(curl -sS https://api.openai.com/v1/chat/completions \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"model\": \"$MODEL\",
+            \"messages\": $messages,
+            \"temperature\": $TEMP,
+            \"max_tokens\": $MAXTOKENS
+        }")
+    handle_error "$response"
+    reply=$(echo "$response" | jq -r '.choices[0].message.content')
+}
+
+view_image() {
+    echo -e "\n🖼 Image was created: $1"
+    select opc in termuxAPP termuxGUI androidAPP browser wayland skip; do
+      curl -sS "$1" -o ${TMPDIR}/temp_image.png
+      if [ "$opc" == "termuxAPP" ]; then
+        ffmpeg -i ${TMPDIR}/temp_image.png -vf scale=512:512 ${TMPDIR}/temp_image512.png &>/dev/null
+        termimage ${TMPDIR}/temp_image512.png
+      elif [ "$opc" == "wayland" ]; then
+        [[ -e ${TMPDIR}/wayland-0 ]] || {
+          export DISPLAY=:0
+          export XDG_RUNTIME_DIR=${TMPDIR}
+          ! command -v termux-x11 &>/dev/null || { Xbin="termux-x11";} || { Xbin="Xwayland";}
+          $(command -v $Xbin) :0 >/dev/null &
+          sleep 5
+        }
+        ristretto --display=:0 ${TMPDIR}/temp_image.png
+      elif [ "$opc" == "termuxGUI" ]; then
+        termux-gui-view -n 15 ${TMPDIR}/temp_image.png 2>/dev/null
+      elif [ "$opc" == "androidAPP" ]; then
+        termux-share ${TMPDIR}/temp_image.png
+      elif [ "$opc" == "browser" ]; then
+        termux-open-url "$1"
+      else
+        break
+      fi
+    done
+    rm ${TMPDIR}/*.png
+}
+
+# === Inicio ===
+banner 
+echo "💬 ChatGPT CLI - Model: $MODEL"
+echo "💡 commands: 'exit', 'image: descripction', 'save' to be saved"
+
+select_chat
+
+while true; do
+    get_prompt
+    [[ "$prompt" == "exit" ]] && break
+    [[ "$prompt" == "save" ]] && { echo "$messages" > "$CHAT_FILE"; echo "💾 Chat was saved."; continue; }
+
+    if [[ "$prompt" =~ ^image: ]]; then
+        img=$(curl -sS https://api.openai.com/v1/images/generations \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"prompt\": \"${prompt#image:}\", \"n\": 1, \"size\": \"$SIZE\"}")
+        handle_error "$img"
+        url=$(echo "$img" | jq -r '.data[0].url')
+        view_image "$url"
+        continue
+    fi
+
+    messages=$(jq --arg role "user" --arg content "$prompt" \
+        '. + [{"role":$role,"content":$content}]' <<< "$messages")
+
+    send_request
+
+    messages=$(jq --arg role "assistant" --arg content "$reply" \
+        '. + [{"role":$role,"content":$content}]' <<< "$messages")
+
+    if command -v bat &>/dev/null; then
+        echo "$reply" | bat --style plain --theme='Visual Studio Dark+'
+    else
+        echo -e "\n🤖 ChatGPT:\n$reply"
+    fi
+
+    echo "$messages" > "$CHAT_FILE"
+done
+
+k-boom

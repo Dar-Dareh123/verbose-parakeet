@@ -1,0 +1,309 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# This file contain all i-Haklab functions
+
+LOGFILE='/data/data/com.termux/files/usr/var/log/i-Haklab.log'
+
+banner() {
+  banner="/data/data/com.termux/files/home/.local/etc/i-Haklab/banner/i-Haklab"
+	[[ ! -e $banner ]] && {
+		wget --tries=20 --quiet \
+			https://raw.githubusercontent.com/ivam3/i-Haklab/master/.deb/home/.local/etc/i-Haklab/banner/i-Haklab \
+				-O $banner;
+	}
+  [[ $1 ]] && banner=/data/data/com.termux/files/home/.local/etc/i-Haklab/banner/custom
+	bash $banner;
+	sleep 0.5;
+}
+export -f banner
+
+k-boom() { 
+	[[ ! -e /data/data/com.termux/files/home/.local/etc/i-Haklab/banner/k-boom ]] && {
+		wget --tries=20 --quiet \
+		https://raw.githubusercontent.com/ivam3/i-Haklab/master/.deb/home/.local/etc/i-Haklab/banner/k-boom \
+		-O /data/data/com.termux/files/home/.local/etc/i-Haklab/banner/k-boom &>/dev/null;
+	}
+	source /data/data/com.termux/files/home/.local/etc/i-Haklab/banner/k-boom;
+}
+export -f k-boom
+
+ctrl_c(){ k-boom;exit 0;}
+export -f ctrl_c
+
+running(){
+	[[ $1 = "time" ]] && {
+		sleep $2 &
+			n=$(echo $!);
+	}
+	[[ $1 = "ps" ]] && {
+		n=$2;
+	}
+	pid=$n
+  spinner=( '█■■■■' '■█■■■' '■■█■■' '■■■█■' '■■■■█' )
+  while [ "$(ps a|awk '{print $1}'|grep $pid)" ]; do
+		for i in "${spinner[@]}";do
+			tput civis
+			printf  "$G\rSearching\t$i\b\b\b\b\b\b\b\b";
+    done
+  done
+  tput cnorm
+  printf "\t$W[$G¡RUN!$W]\n";
+}
+export -f running
+
+STDERROOT(){ printf "$R\n(_➤)$W Rooted device required";exit;}
+export -f STDERROOT
+
+STDERR(){
+	[[ $# -eq 0 ]] && {
+		printf "$R(_➤)$W missing argument, type i-Haklab help for helpper\n";
+			exit;
+		}
+	[[ $1 = broken ]] && {
+		printf "$R(_➤)$W i-Haklab is broken, please reinstall it.";
+			exit;
+		}
+}
+export -f STDERR
+
+chk-Cuser() {
+	while [ ! $(id -u) -ne 0 ]; do
+        	printf "$R\n(_➤)$W You need to be a common user\n"
+        	exit
+	done
+}
+export -f chk-Cuser
+
+chk-Ruser() {
+	while [ ! $(id -u) -eq 0 ]; do
+		printf "$R\n(_➤) You need to be a root user$W\n"
+		exit
+	done
+}
+export -f chk-Ruser
+
+chk-pkg(){
+	command -v $1 >/dev/null || { printf "$R(_➤)$W $1 needed$R |$W run apt install $2";exit;}
+}
+export -f chk-pkg
+
+chk-root(){
+	if [[ -x /system/xbin/su ]] || [[ -x /su/bin/su ]] || [[ -x /sbin/su ]]
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+export -f chk-root
+
+chk-network(){
+	until ping -q -c1 -W 1 8.8.8.8 >/dev/null 2>/dev/null
+	do
+		printf "$R(_➤) Please connect to internet$W\n"
+		exit
+	done
+}
+export -f chk-network
+
+chk-tunnel() {
+	if ping -q -c 1 -W 1 localtunnel.me >/dev/null 2>&1;then
+		TUNNEL="localtunnel.me"
+	elif ping -q -c 1 -W 1 serverless.social >/dev/null 2>&1;then
+		TUNNEL="serverless.social"
+	else
+		printf "$R\n(_➤)$W Server not available$R |$W try it later\n"
+		exit
+	fi
+}
+export -f chk-tunnel
+
+getPORT(){
+	chk-pkg nmap nmap
+	while [[ $(nmap -p$LPORT $LOOPBACK|grep "$LPORT"|awk -F " " '{print $2}') = "open" ]]
+	do
+		let LPORT=$LPORT+1
+	done
+}
+export -f getPORT
+
+helpper() {
+	printf "$Y\n(_➤)$W i-Haklab $version (c) 2024 by @Ivam3 - Is a hacking laboratory that contains open source tools recommended by Ivam3. If the law is violated with it's use, this would be the responsibility of the user who handled it.\n$Y\nSyntax:$W i-Haklab [-option-] [-args-]\n
+            $Y[--] Setting Options [--]$W
+_$Y   OPTIONS$W  |$Y     ARGUMENTS$W     |$Y    DESCRIPTION$W
+╰─about──────+──<name─of─tool>───➤ Show informations about tool/framework
+|   ╰────example─────────────────{─i-Haklab about crunch─}
+╰─aptup──────➤───────────────────➤ Update termux manually, packages by packages
+╰─help───────➤───────────────────➤ Show this help menu
+╰─passwd─────+────set─|─new──────➤ Set and change the login termux
+|                 ╰─────|────ex──{─i-Haklab passwd set──➤ password|fingerprint
+|                       ╰────ex──{─i-Haklab passwd new─➤ get a new password
+╰─pd─────────➤─<distro─X11─list>─➤ Run linux distribution in proot enviroment.
+|                  ╰─────|──|─ex─{─i-Haklab pd alpine──➤ for only CLi
+|                        ╰──|─ex─{─i-Haklab pd alpine X11──➤ for graphical enviroment
+|                           ╰─ex─{─i-Haklab pd list──➤ show all linux distribution available
+╰─setapikey──➤───────────────────➤ Set API Keys to use in i-Haklab features
+╰─setbanner──➤───────────────────➤ Enable, disable and custom the i-Haklab wall banner
+╰─setuser────➤───────────────────➤ Set i-Haklab user name
+╰─show───────+─────alltools──────➤ List all tools/frameworks available on i-Haklab
+|   ╰────────+────instatools─────➤ Show all installed tools/framewotks
+|   ╰────────+──────books────────➤ Show all books available to download
+|   ╰────────+─────tutorials─────➤ Show tutorials available
+|   ╰────────+───────QG──────────➤ Show quick guides available
+╰speedtest───➤───────────────────➤ Run a speed test of your network
+╰─version────➤───────────────────➤ Show i-Haklab version installed
+╰─weechat────➤───────────────────➤ Connect with irc Ivam3byCinderella chat
+╰─Xwayland───➤───────────────────➤ Run xserver over TermuXwayland app with xfce4 as window manager
+|            |                   |
+|            |                   |
+$Y       [--] Automatitation Options [--]$W
+_$Y   OPTIONS$W  |$Y     ARGUMENTS$W     |$Y    DESCRIPTION$W
+╰apkactivity─+─<path─to─apk─file>➤ Get the main activity from .apk file
+|
+╰──backup────+──create|restore───➤ Create a backup of Termux or restore it
+|                  |    ╰example─{─i-Haklab restore path/to/file.tar.gz
+|                  ╰─example─────{─i-Haklab create <in/ex> [in=internal ex=external sdcard]
+╰─binchecker─➤───────────────────➤ Get informacion about BINs (CC,DC)
+|
+╰bruteforce─+─ftp|mail|ssh|telnet➤ Brute force attack at several servers.
+|    ╰───example─for─ftp─────────{─i-Haklab bruteforce ftp
+|    ╰───example─for─mail────────{─i-Haklab bruteforce mail ivam3@live.com, gmail or live.com
+|
+╰──chatGPT──➤───<--help/-h>──────➤ Connect with OpenAi API to interact with ChatGPT-3 via CLi.
+|    |               ╰──example──{─i-Haklab chatGPT -h [setting options]
+|    ╰───example─────────────────{─i-Haklab chatGPT
+╰──ESmsg────+──encode/decode─────➤ Encode|decode secret message into a ASCII file.
+|                    ╰──example──{─i-Haklab ESmsg <encode/decode-}
+|
+╰──tunnel───+─<port─+─subdomain>─➤ Start a SSH client to request TCP port forwarding
+|    ╰───example─────────────────{─i-Haklab tunnel -p 4444 -s my-subdomain-}
+|
+╰─handler───+─<name─of─file.rc>──➤ Start handler on msfconsole with previous setting
+|
+╰───msf─────+─dirscan─+─IPtarget─➤ Enumerate directories/subdirecotires from a server.
+|    |          ╰──example───────{─i-Haklab msf dirscan 10.10.10.242-}
+|    ╰──────+─embed──────────────➤ Embed a metasploit payload into legitim apk file.
+|               ╰─ex─for─outlan──{─i-Haklab msf embed 6.tcp.ngrok.io 4546 /path/to/file.apk
+|    ╰──────+─payapk─+─tun0:port─➤ Create a coded payload .apk
+|    |          ╰─ex─for─outlan──{─i-Haklab msf payapk 6.tcp.ngrok.io 23453─}
+|    ╰──────+─payexe─+─tun0:port─➤ Create a coded payload .exe
+|    |         ╰─ex─for─inlan───{─i-Haklab msf payexe 192.168.0.1 8080─}
+|    ╰──────+─paypdf─+─tun0:port─➤ Create a coded payload .pdf
+|    |          ╰─ex─default─set─{─i-Haklab msf paypdf─}
+|    ╰──────+──────shodan────────➤ Search vulnerable webcam servers using metasploit
+|
+╰─ngroklink─➤────────────────────➤ Show the current ngrok link
+|
+╰─ngrokssh──➤─port+protocol+file─➤ Connect with ngrok servers via SSH protocol
+|                   ╰──example─1─{─i-Haklab ngrokssh -p 4546 -t http -f path/to/specific/id_rsa-file
+|                   ╰──example─2─{─i-Haklab ngrokssh -p 8080 -t tcp (default file:\$HOME/.ssh/id_rsa)
+|
+╰─payvid────➤────────────────────➤ Hide a Reverse Shell with a Video File by Exploiting Linux OS.
+|
+╰─phonescan─+─<phonenumber>──────➤ A phone number information scaner
+|                  ╰──example────{─i-Haklab phonescan 525584923476─}
+|
+╰servers4test────────────────────➤ Init deliberately insecure web application for pentesting.
+|
+╰──4share───➤───(server─name)────➤ Init web server for share files remotely and securely
+|    ╰─────────────────|─────────{─Default credentials = Admin:password─}
+|                      ╰─────────{─servers names: localtunnel, localhost.run and cloudflared─}
+|                      ╰─example─{─i─Haklab 4share localtunnel─}
+╰─usbtest───➤─<path-to-device>───➤ Test usb device connected via OTG 
+|                   ╰─example────{─i-Haklab usbtest /dev/bus/usb/001─}
+|           |                    |
+|           |                    |
+$Y          [--] DIRECT COMMANDS [--]
+$W  Those commands do not need the i-Haklab command
+             Just type the command.
+_$Y        COMMAND$W                 |$Y    DESCRIPTION$W
+╰apt─────────────────────────────➤ Install/remove and configure packages/tools/frameworks
+╰adminfiles──────────────────────➤ Copy any file from internal/external storage at termux directory
+╰bat─────────────────────────────➤ Use it instead of command 'cat' for text highlighting
+╰cmd─────────────────────────────➤ Mannage android main settings over Termux
+╰df──────────────────────────────➤ Provides information about the mounted memory
+╰du──────────────────────────────➤ Provides recursive information about the weight of directories and files
+╰fixer───────────────────────────➤ Automate process to fix Termux issues
+╰fzf─────────────────────────────➤ Easy and faster Fuzzy finder
+╰gitbrowsering───────────────────➤ Search repositories in github over CLi
+╰LOCALHOST───────────────────────➤ Show the current internet protocol over LAN
+╰lock────────────────────────────➤ Block Termux's screen
+╰osrframework────────────────────➤ OSINT setoolkit
+╰mypip───────────────────────────➤ Show your public internet protocol
+╰openvpn─────────────────────────➤ Open openvpn application
+╰omf─────────────────────────────➤ Change Oh-my-fish theme
+╰phantom─ps──────────────────────➤ Change the limit of phantom process at 2147483647 
+|  ╰─────────────────────────────{ Screen division with android developer options is required}
+╰pm──────────────────────────────➤ For android packages mannager 
+╰postgresql──────────────────────➤ Start, stop or restart postgres data base
+╰proxy───────────────────────────➤ Execute cli commands over tor proxychains
+╰rmcache─────────────────────────➤ Remove current session cache, temporal files & residual APT packages
+╰serverapache────────────────────➤ Init apache server
+╰serverphp───────────────────────➤ Init php server
+╰sudo────────────────────────────➤ Execute commands or init an enviroment as fake root user
+╰telegram────────────────────────➤ Open telegram application
+╰traductor───────────────────────➤ Init a command line traductor
+╰──────────────────────────────────────────────────────────────────────────────────────────|\n\n"
+}
+export -f helpper
+
+pass(){
+	user=$(grep "USER" ${HOME}/.local/etc/fish/config.fish|awk '{print $NF}')
+	[[ $1 = Set ]] && {
+		login=$(grep "pass" ${HOME}/.local/libexec/i-Haklab.login|tail -n 1)
+		select opt in Password Fingerprint Disable Exit
+		do
+			[[ $opt = Exit ]] && { exit 0;}
+			[[ $opt = Password ]] && { opt="Get";}
+			sed -i "s|$login|pass $opt|g" $HOME/.local/libexec/i-Haklab.login
+			break
+		done
+	}
+
+	[[ $1 = New ]] && {
+		while read -sp "New password: " pass && printf "\n" && [[ -z $pass ]]
+		do
+			continue
+		done
+		while read -sp "Retype new password: " pass2 && printf "\n" && [[ -z $pass2 ]]
+		do
+			continue
+		done
+		[[ $pass = $pass2 ]] && {
+			echo $pass|openssl enc -aes-256-cbc -md sha512 -a -pbkdf2 -iter 100000 \
+			-salt -pass pass:Secret@123# > $HOME/.local/etc/i-Haklab/.Ivam3byCinderella;
+					echo -en "\e[32mNew password was successfully set.\e[0m";
+				} || { echo -en "\e[31mERROR:\e[0m Sorry, passwords do not match.";pass New;
+			}
+		}
+
+		[[ $1 = Get ]] && {
+			while read -sp "Password: " pass && [[ -z $pass ]]
+			do
+				continue
+			done;
+			until [[ $pass = $(cat $HOME/.local/etc/i-Haklab/.Ivam3byCinderella|openssl enc -aes-256-cbc -md sha512	-a -d -pbkdf2 -iter 100000	-salt -pass pass:Secret@123#) ]]
+			do
+				echo -en "\e[31mERROR:\e[0m wrong password\n"
+#				termux-toast -b red Wrong password
+				pass Get
+			done
+#			termux-toast -b green Welcome Back $user;
+#				banner;
+			}
+
+		[[ $1 = Fingerprint ]] && { touch $TMPDIR/lock.tmp;
+			until [[ $(jq -r .auth_result $TMPDIR/lock.tmp) = "AUTH_RESULT_SUCCESS" ]]
+			do
+				termux-fingerprint -t "i-Haklab on Termux" -s "@Ivam3byCinderella" > $TMPDIR/lock.tmp
+#				termux-toast -b red Access denied
+			done
+            rm $TMPDIR/lock.tmp;
+#			termux-toast -b green Welcome Back $user;
+		}
+
+		[[ $1 = Disable ]] && {
+			echo "Access without pass" >>$LOGFILE
+#			termux-toast -b green Welcome Back $user;
+		}
+}
+export -f pass

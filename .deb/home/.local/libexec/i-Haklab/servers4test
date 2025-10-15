@@ -1,0 +1,148 @@
+#!/data/data/com.termux/files/usr/bin/bash
+IFS=$'\n\t'
+trap ctrl_c 2
+
+source ${HOME}/.local/etc/i-Haklab/variables
+source $iHETC/functions
+
+chk-pkg php php
+chk-pkg mariadb mariadb
+
+declare chk_dbuser_exist
+declare pid
+user="root"
+rootdir="${HOME}/.local/var/service/www/servers4test"
+
+chk-rootdir(){
+    [[ -d $rootdir/$1 ]] && {
+        return 0
+    } || { 
+        echo -en $G"\r(➤_)$W Installing $answ server ...\n"
+        return 1
+    }
+}
+
+createDB(){ 
+    if [[ $(mariadb -u $user -p$pass -e "show DATABASES;"|grep $db) != $db ]] >/dev/null 2>/dev/null 
+    then 
+        echo -en $G"\r(➤_)$W Creating $answ database ... "
+        mariadb -u $user -p$pass -e "create DATABASE $db;" >/dev/null 2>/dev/null 
+        echo -en "\tDONE!!\n"
+    fi
+}
+
+[[ -e ${PREFIX}/var/run/*.pid ]] && {
+	rm -rf ${PREFIX}/var/run/*.pid;
+}
+
+until [ ! -z $pid ]; do
+  killall mariadbd >/dev/null 2>/dev/null
+  tput civis
+  echo -en $G"\r(➤_)$W Running daemon ..."
+  mariadbd-safe >/dev/null 2>/dev/null &
+  sleep 3
+  export pid=$(echo $!)
+  echo -en "\tDONE!!\n"
+  tput cnorm 
+done
+
+while [ "$(ps a|awk '{print $1}'|grep $pid)" ]
+do
+    while read -sp "(>_) Enter data base password: " pass && printf "\n" && [[ -z $pass ]]; do
+        continue
+    done
+
+    until [ ! -z $chk_dbuser_exist ] 
+    do 
+        chk_dbuser_exist=$(mariadb -u $user -p$pass -e "use mysql;SELECT user FROM user;"|\
+            grep $user|head -n1) 
+        [[ $chk_dbuser_exist != $user ]] && {
+            echo -en $G"(>_)$W Set data base ..."
+            mariadb-secure-installation 
+        }
+    done 
+
+    [[ ! -d ${PREFIX}/var/lib/mysql  ]] && { 
+        mariadb-install-db >/dev/null 2>/dev/null;
+    } || {
+        echo -en $G"\r(>_)$W Upgrading data base ..."
+        mariadb-upgrade >/dev/null 2>/dev/null;
+        echo -en "DONE!!\n"
+    }
+
+    echo -en $Y"\r(➤_)$W Choose a platform\n"
+	select answ in bWAPP DVWA mutillidae Exit
+	do
+        case $answ in 
+            Exit) 
+                kill -TERM $pid >/dev/null 2>/dev/null
+			    exit 0
+                ;;
+            bWAPP)
+                db=$answ
+                chk-rootdir $answ || { 
+                    SQL_COMMAND="
+CREATE TABLE IF NOT EXISTS users (id int(10) NOT NULL AUTO_INCREMENT,login varchar(100) DEFAULT NULL,password varchar(100) DEFAULT NULL,email varchar(100) DEFAULT NULL,secret varchar(100) DEFAULT NULL,activation_code varchar(100) DEFAULT NULL,activated tinyint(1) DEFAULT '0',reset_code varchar(100) DEFAULT NULL,admin tinyint(1) DEFAULT '0',PRIMARY KEY (id)) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+INSERT INTO users (login, password, email, secret, activation_code, activated, reset_code, admin) VALUES ('A.I.M.', '6885858486f31043e5839c735d99457f045affd0', 'bwapp-aim@mailinator.com', 'A.I.M. or Authentication Is Missing', NULL, 1, NULL, 1),('bee', '6885858486f31043e5839c735d99457f045affd0', 'bwapp-bee@mailinator.com', 'Any bugs?', NULL, 1, NULL, 1);
+CREATE TABLE IF NOT EXISTS blog (id int(10) NOT NULL AUTO_INCREMENT,owner varchar(100) DEFAULT NULL,entry varchar(500) DEFAULT NULL,date datetime DEFAULT NULL,PRIMARY KEY (id)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+CREATE TABLE IF NOT EXISTS visitors (id int(10) NOT NULL AUTO_INCREMENT,ip_address varchar(50) DEFAULT NULL,user_agent varchar(500) DEFAULT NULL,date datetime DEFAULT NULL,PRIMARY KEY (id)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+CREATE TABLE IF NOT EXISTS movies (id int(10) NOT NULL AUTO_INCREMENT,title varchar(100) DEFAULT NULL,release_year varchar(100) DEFAULT NULL,genre varchar(100) DEFAULT NULL,main_character varchar(100) DEFAULT NULL,imdb varchar(100) DEFAULT NULL,tickets_stock int(10) DEFAULT NULL,PRIMARY KEY (id)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+INSERT INTO movies (title, release_year, genre, main_character, imdb, tickets_stock) VALUES ('G.I. Joe: Retaliation', '2013', 'action', 'Cobra Commander', 'tt1583421', 100),('Iron Man', '2008', 'action', 'Tony Stark', 'tt0371746', 53),('Man of Steel', '2013', 'action', 'Clark Kent', 'tt0770828', 78),('Terminator Salvation', '2009', 'sci-fi', 'John Connor', 'tt0438488', 100),('The Amazing Spider-Man', '2012', 'action', 'Peter Parker', 'tt0948470', 13),('The Cabin in the Woods', '2011', 'horror', 'Some zombies', 'tt1259521', 666),('The Dark Knight Rises', '2012', 'action', 'Bruce Wayne', 'tt1345836', 3),('The Fast and the Furious', '2001', 'action', 'Brian O''Connor', 'tt0232500', 40),('The Incredible Hulk', '2008', 'action', 'Bruce Banner', 'tt0800080', 23),('World War Z', '2013', 'horror', 'Gerry Lane', 'tt0816711', 0);
+CREATE TABLE IF NOT EXISTS heroes (id int(10) NOT NULL AUTO_INCREMENT,login varchar(100) DEFAULT NULL,password varchar(100) DEFAULT NULL,secret varchar(100) DEFAULT NULL,PRIMARY KEY (id)) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+INSERT INTO heroes (login, password, secret) VALUES ('neo', 'trinity', 'Oh why didn''t I took that BLACK pill?'),('alice', 'loveZombies', 'There''s a cure!'),('thor', 'Asgard', 'Oh, no... this is Earth... isn''t it?'),('wolverine', 'Log@N', 'What''s a Magneto?'),('johnny', 'm3ph1st0ph3l3s', 'I''m the Ghost Rider!'),('seline', 'm00n', 'It wasn''t the Lycans. It was you.');
+"
+                    wget --quiet "https://downloads.sourceforge.net/project/bwapp/bWAPP/bWAPPv2.2/bWAPPv2.2.zip?ts=gAAAAABomLffllceHOtpSb5A2EHmL7RYanaLpENJ4oYBIAadgUpSUsqc6Q-z3LIHYmndFkhP1EQZoiEq-nnzCZsr7CiiGFkq6A%3D%3D&use_mirror=versaweb&r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fbwapp%2Ffiles%2FbWAPP%2FbWAPPv2.2%2F" -O $rootdir/$answ.zip 2>$LOGFILE
+                    [[ -e $rootdir/$answ.zip ]] && { 
+                        unzip -qq $rootdir/$answ.zip -d $rootdir/ 2>$LOGFILE
+                        ls $rootdir | xargs rm 2>/dev/null
+                    }
+                    sed -i "20s/\"localhost\"/\"127.0.0.1\"/" $rootdir/$answ/admin/settings.php 2>$LOGFILE
+                    sed -i "22s/\"\"/\"root\"/" $rootdir/$answ/admin/settings.php 2>$LOGFILE
+                    createDB $db
+                    mariadb -u "$user" -p"$pass" "$db" -e "$SQL_COMMAND" 2>$LOGFILE
+                }
+                break
+                ;;
+            DVWA) 
+                db=dvwa
+                chk-rootdir $answ || { 
+                    git clone --quiet --depth 1 https://github.com/digininja/DVWA.git \
+                        $rootdir/$answ 2>$LOGFILE 
+                    cp $rootdir/$answ/config/config.inc.php.dist $rootdir/$answ/config/config.inc.php
+                    sed -i "20s/'dvwa'/'root'/" $rootdir/$answ/config/config.inc.php 2>$LOGFILE
+                    sed -i "21s/'p@ssw0rd'/'root'/" $rootdir/$answ/config/config.inc.php 2>$LOGFILE
+                    sed -i "574s/array/?array/" $rootdir/$answ/$db/includes/Parsedown.php 2>$LOGFILE
+                    sed -i "811s/array/?array/" $rootdir/$answ/$db/includes/Parsedown.php 2>$LOGFILE
+                    sed -i "897s/array/?array/" $rootdir/$answ/$db/includes/Parsedown.php 2>$LOGFILE
+                    createDB $db
+                    echo -en "\tDONE!!\n"
+                }
+                break
+                ;;
+            mutillidae)
+                chk-rootdir $answ || { 
+                    git clone --quiet --depth 1 https://github.com/webpwnized/mutillidae \
+                        $rootdir/$answ 2>$LOGFILE
+                    createDB $answ
+                    sed -i '53 {s|^|//|}' $rootdir/$answ/classes/MySQLHandler.php 2>$LOGFILE
+                    sed -i "53a static public $mMySQLDatabasePassword = \"root\";" $rootdir/$answ/classes/MySQLHandler.php 2>$LOGFILE
+                    echo -en "\tDONE!!\n"
+                }
+                break
+                ;;
+        esac
+    done 
+
+    getPORT
+	echo -en $B"(➤_)$W Web server $B$answ$W activated over:$Y http://$LOOPBACK:$LPORT$B\n  ╰──➤$W press enter to$R stop$W it.\n"
+    
+    [[ $answ = mutillidae ]] && { answ=$answ/src/; } 
+	
+    php -S $LOOPBACK:$LPORT -t $rootdir/$answ 2>>$LOGFILE &
+    PHPpid=$(echo $!)
+    termux-open-url http://$LOOPBACK:$LPORT
+    read enter
+    break
+    kill -TERM $PHPpid
+done
+kill -TERM $pid >/dev/null 2>>$LOGFILE

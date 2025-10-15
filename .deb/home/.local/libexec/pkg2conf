@@ -1,0 +1,246 @@
+#!/data/data/com.termux/files/usr/bin/bash
+IFS=$'\n\t'
+trap ctrl_c 2
+
+source ${HOME}/.local/etc/i-Haklab/variables
+source $iHETC/functions
+echo -en "Setting $1 following i-Haklab instructions ...  \b"
+
+case "$1" in 
+    apache2|phpmyadmin)    
+        USRapache="${PREFIX}/etc/apache2"
+        HOMEapache="${HOME}/.local/etc/apache2"
+		
+        for i in apache2 phpmyadmin; do
+			[[ -d ${HOME}/.local/etc/$i ]] || {
+				mkdir -p ${HOME}/.local/etc/$i;
+			}
+		done
+
+		[[ -e $HOMEapache/httpd.conf ]] || {
+			curl -fsSL $iHDB/.local/etc/apache2/httpd.conf -o $HOMEapache/httpd.conf;
+		}
+		[[ -e $HOMEapache/php_module.conf ]] || {
+			curl -fsSL $iHDB/.local/etc/apache2/php_module.conf -o $HOMEapacheE/php_module.conf;
+		}
+		[[ -e $USRapache/httpd.conf ]] && {
+			rm -rf $USRapache/httpd.conf;
+		}
+		[[ -e ${PREFIX}/etc/phpmyadmin/config.inc.php ]] && {
+			rm -rf ${PREFIX}/etc/phpmyadmin/config.inc.php;
+		}
+        curl -fsSL $iHDB/.local/etc/phpmyadmin/config.inc.php \
+            -o ${HOME}/.local/etc/phpmyadmin/config.inc.php;
+		ln -s $HOMEapache/httpd.conf $USRapache/httpd.conf
+        ln -s $HOMEapache/php_module $USRapache/conf.d/php_module.conf
+		ln -s ${HOME}/.local/etc/phpmyadmin/config.inc.php ${PREFIX}/etc/phpmyadmin/config.inc.php 
+        ;; # --->  Nuevo comando 
+
+    clamav)
+        [[ -e ${PREFIX}/clamav/freshclam.conf.sample ]] && {
+          mv ${PREFIX}/clamav/freshclam.conf.sample ${PREFIX}/clamav/freshclam.conf
+        }
+        freshclam 
+        ;; # --->  Nuevo comando 
+
+    fish)
+        [[ -e ${PREFIX}/etc/fish/config.fish ]] && {
+            rm -f ${PREFIX}/etc/fish/config.fish 2>>$LOGFILE
+        }
+        ln -s ${HOME}/.local/etc/fish/config.fish ${PREFIX}/etc/fish/config.fish 2>>$LOGFILE
+        ;; # --->  Nuevo comando 
+
+	gdb)
+        [[ -d $TOOLS/peda ]] && { rm -rf $TOOLS/peda;}
+		git clone --quiet https://github.com/longld/peda.git $TOOLS/peda
+		[[ -e ${HOME}/.gdginit ]] || touch ${HOME}/.gdbinit
+		echo "source $TOOLS/peda/peda.py" > ${HOME}/.gdbinit
+		;; # --->  Nuevo comando 
+
+    mariadb)
+        root=user="root"
+        chk_dbuser_exist=$(mariadb -u $user -p$pass -e "use mysql;SELECT user FROM user;"|\
+            grep $user|head -n1)
+        if [[ $chk_dbuser_exist != $user ]]; then 
+            mariadbd-safe &
+            mariadb-secure-installation
+            mariadb-install-db 
+        fi
+        mariadb-upgrade
+        ;;
+
+    n8n)
+        for i in "nodejs-lts python binutils make clang pkg-config libsqlite ndk-sysroot" ; do 
+            yes|apt install $i >/dev/null 2>/dev/null
+        done 
+        npm install -g pm2 
+        mkdir -p ${HOME}/.n8n 
+        echo "[📢] Credits to @Maka {https://github.com/kuromi04}"
+### ADD THIS INSTRUCCION IN I-HAKLAB ABOUT N8N FILE ########################################
+#        grep -q "pm2 resurrect" "$HOME/.bashrc" || echo "pm2 resurrect" >> "$HOME/.bashrc"#
+############################################################################################
+        ;;
+
+    nano)
+		cat <<- CONF > $HOME/.nanorc
+set linenumbers
+set historylog
+set tabsize 4
+set autoindent
+set mouse
+set titlecolor white,gray
+set statuscolor white,red
+set keycolor white,gray
+set functioncolor green
+set numbercolor white,gray
+set softwrap
+set softwrap
+#set nohelp
+		CONF
+		;; # --->  Nuevo comando 
+
+	neovim)
+		[[ -d ${HOME}/.config/nvim ]] || { mkdir -p ${HOME}/.config/nvim;}
+        curl -fsSL $iHDB/.config/nvim.zip -o ${HOME}/.config/nvim/nvim.zip
+        unzip -qo ${HOME}/.config/nvim/nvim.zip -d ${HOME}/.config/nvim
+        rm -rf ${HOME}/.config/nvim/nvim.zip
+        npm install -g neovim bash-language-server pyright >/dev/null 2>/dev/null
+        pip3 --no-color --quiet --no-cache-dir install neovim
+		yes|pkg i luarocks lua-language-server >/dev/null 2>/dev/null 
+        nvim +x +x
+        ;; # --->  Nuevo comando 
+	privoxy)
+		echo "forward-socks5 / 127.0.0.1:9050 ." >> $PREFIX/etc/privoxy/config 
+		;; # --->  Nuevo comando 
+
+	proxychains-ng)
+		[[ -e ${PREFIX}/etc/proxychains.conf ]] && {
+			rm -rf ${PREFIX}/etc/proxychains.conf;
+		}
+		[[ -e ${HOME}/.local/etc/proxychains.conf ]] || {
+           curl -fsSL $iHDB/.local/etc/proxychains.conf -o ${HOME}/.local/etc/proxychains.conf;
+		}
+		ln -s ${HOME}/.local/etc/proxychains.conf ${PREFIX}/etc/proxychains.conf
+		;; # --->  Nuevo comando 
+
+  python)
+    python -m pip --no-color --quiet --no-cache-dir install bpython
+    ;; # --->  Nuevo comando 
+
+  radare2)
+    #[[ -d $HOME/.local/share/radare2 ]] && {
+      r2pm -qU && r2pm -ci r2ghidra-sleigh
+    #} || {
+      r2pm -qUU
+    #}
+    ;; # --->  Nuevo comando 
+
+	tigervnc)
+		[[ -d ${HOME}/.vnc ]] || {
+			mkdir ${HOME}/.vnc;
+		}
+		cat <<- CONF > ~/.vnc/xstartup
+#!/data/data/com.termux/files/usr/bin/sh
+## This file is executed during VNC server
+## startup.
+
+# Launch terminal emulator Aterm.
+# Requires package 'aterm'.
+aterm -geometry 160x48+20+20 -ls &
+
+# Launch Tab Window Manager.
+# Requires package 'xorg-twm'.
+startxfce4
+		CONF
+		;; # --->  Nuevo comando 
+
+	tmux)
+        [[ ! -d "${HOME}/.config/tmux" ]] && { mkdir -p "${HOME}/.config/tmux";}
+        [[ -d ${HOME}/.tmux ]] && { rm -rf ${HOME}/.tmux;}
+
+        curl -fsSL $iHDB/.config/tmux/tmux.conf.zip -o ${TMPDIR}/tmux.conf.zip
+        unzip -qq -o ${TMPDIR}/tmux.conf.zip -d "${HOME}/.config/tmux" && rm "${TMPDIR}/tmux.conf.zip"
+        
+        ln -s -f "${HOME}/.config/tmux/.tmux.conf"   
+        sed -i "11a set-option -g default-shell ${PREFIX}/bin/fish" "${HOME}/.config/tmux/.tmux.conf"
+        printf "[!] Press Ctrl+b+shift+I to load the tmux settings\n"
+	    ;; # --->  Nuevo comando 
+
+	tor)
+		[[ -e ${PREFIX}/etc/tor/torrc ]] && {
+			rm -rf ${PREFIX}/etc/tor/torrc;
+		} || {
+			mkdir -p ${PREFIX}/etc/tor;
+		}
+		[[ -e ${HOME}/.local/etc/tor/torrc ]] || {
+			mkdir -p ${HOME}/.local/etc/tor;
+                   curl -fsSL $iHDB/.local/etc/tor/torrc -o ${HOME}/.local/etc/tor/torrc;
+		}
+		ln -s ${HOME}/.local/etc/tor/torrc ${PREFIX}/etc/tor/torrc 2>/dev/null
+		;; # --->  Nuevo comando 
+
+	vim)
+		[[ -d ${HOME}/.vim ]] && {
+			rm -rf ${HOME}/.vim
+		}
+		[[ -e ${HOME}/.vimrc ]] && {
+			rm -rf ${HOME}/.vimrc
+		}
+       curl -fsSL $iHDB/.local/etc/i-Haklab/setvim.zip -o ${HOME}/setvim.zip
+		[[ -e ${HOME}/setvim.zip ]] || {
+			STDERR
+		}
+		unzip -qq ${HOME}/setvim.zip -d ${HOME}
+		rm -rf ${HOME}/setvim.zip
+    python -m pip --no-color --quiet --no-cache-dir install jedi
+    vim +PluginInstall +PlugUpdate +CocInstall +coc-clangd +coc-sh +coc-jedi +x +x +x 2>>$LOGFILE
+		;; # --->  Nuevo comando 
+
+	youtubedr)
+		executable="youtubedr download"
+		cat <<- CONF > ${HOME}/.netrc
+#!${PREFIX}/bin/bash
+#
+machine <extractor> login <login> password <password>
+#
+#Follow my example:
+#
+#machine youtube login myaccount@gmail.com password my_youtube_password
+#machine twitch login my_twitch_account_name password my_twitch_password
+CONF
+		chmod 711 ~/.netrc
+		cat <<- CONF > ${PREFIX}/bin/termux-url-opener
+#!${PREFIX}/bin/bash
+#
+echo "Choose a format :"
+echo "For audio only press 1"
+echo "For video 360p press 2"
+echo "For video 480p press 3"
+echo "For video 720p press 4"
+echo "For video 1080p press 5"
+read option
+command='-no-mtime -o /data/data/com.termux/files/home/storage/shared/Youtube/%(title)s.%(ext)s -f'
+if [ "\$option" -eq "1" ]; then
+	echo "\$command 140" > ${HOME}/.config/youtube-dl/config
+	exec $executable "\$1"
+elif [ "\$option" -eq "2" ]; then
+	echo "\$command \"best[height<=360]\"" > ${HOME}/.config/youtube-dl/config
+	exec $executable "\$1"
+elif [ "\$option" -eq "3" ]; then
+	echo "\$command \"best[height<=480]\"" > ${HOME}/.config/youtube-dl/config
+	exec $executable "\$1"
+elif [ "\$option" -eq "4" ]; then
+	echo "\$command \"best[height<=720]\"" > ${HOME}/.config/youtube-dl/config
+	exec $executable "\$1"
+elif [ "\$option" -eq "5" ]; then
+	echo "\$command \"best[height<=1080]\"" > ${HOME}/.config/youtube-dl/config
+	exec $executable "\$1"
+fi
+CONF
+	 dos2unix ${PREFIX}/bin/termux-url-opener &>/dev/null
+	 chmod 711 ${PREFIX}/bin/termux-url-opener
+		;; # --->  Nuevo comando 
+esac
+
+echo "[💡] Run 'i-Haklab about $1' to get more information about this tool\n"
+echo "[✔] DONE."

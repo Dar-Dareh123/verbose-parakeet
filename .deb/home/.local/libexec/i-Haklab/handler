@@ -1,0 +1,75 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#This file is part of i-Haklab command
+IFS=$'\n\t'
+trap ctrl_c 2
+source $HOME/.local/etc/i-Haklab/variables
+source $iHETC/functions
+
+chk-pkg msfconsole metasploit-framework
+
+getPORT
+declare PAYLOAD=""
+declare LHOST=$LOCALHOST
+declare rcDir="$iHETC/rcFiles"
+mkdir -p $rcDir
+
+
+main(){ 
+rcFiles=$(find $rcDir -maxdepth 1 -type f -iname "*.rc"|awk -F "/" '{print $NF}' 2>/dev/null)
+select answ in $rcFiles Create Delete Exit; do
+    case $answ in
+        Create ) CreateHandler && main;;
+        Delete ) DelFile && main;;
+        Exit ) exit 0 ;;
+        * ) fileRC=$answ ;;
+    esac
+    break
+done 
+}
+
+CreateHandler(){
+    echo -en "Handler file name (without .rc) "
+    while read -p ":─➤ " fileName && [ -z $fileName  ]; do
+        continue
+    done
+    if [[ -f "$rcDir/$fileName.rc" ]]; then
+        echo -en "$Y[!]$W Handler file $fileName.rc already exists.\n ╰──➤ Please choose a different name."
+        createHandler
+    fi
+
+    echo -en "Enter payload (e.g., android/meterpreter/reverse_tcp) "
+    while read -p ":─➤ " PAYLOAD && [ -z $PAYLOAD  ]; do
+        continue
+    done
+
+    cat <<- CONF > $rcDir/$fileName.rc
+use exploit/multi/handler
+set PAYLOAD $PAYLOAD
+set LHOST $LHOST 
+set LPORT $LPORT
+run
+CONF
+}
+
+DelFile(){
+    echo -en "Handler file to delete (without .rc) "
+    while read -p ":─➤ " fileName && [ -z $fileName  ]; do
+        continue
+    done
+    if [[ ! -f "$rcDir/$fileName.rc" ]]; then
+        echo -en "$Y[!]$W Handler file $fileName.rc does not exist."
+        DelFile
+    fi
+
+    rm -f $rcDir/$fileName.rc 
+    echo -e "$G[✔]$W Handler file $fileName.rc deleted successfully."
+}
+
+banner
+main
+
+printf "$Y(_➤)$W HOST= $LHOST\n$Y(_➤)$W PORT= $LPORT\n$Y(_➤)$W Payload= $PAYLOAD\n$Y(_➤)$W Handler file= $fileName.rc\n"
+
+chmod 750 $rcDir/*
+
+msfconsole -q -r $rcDir/$fileName.rc
